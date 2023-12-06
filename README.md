@@ -2,4 +2,4 @@
 
 Work in progress, currently an error occurs when running.
 
-cargo run --release -- test.txt output.txt
+cargo run -- test.txt output.txt
