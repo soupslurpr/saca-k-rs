@@ -3,7 +3,6 @@ Adapted from SACA-K C++ demo source code.
 Check original-code-attribution.txt.
 */
 
-
 // Set only the highest bit as 1, i.e. 1000...
 const EMPTY_U32: u32 = 1 << (std::mem::size_of::<u32>() * 8 - 1);
 const EMPTY_I32: i32 = 1 << (std::mem::size_of::<i32>() * 8 - 1);
@@ -35,7 +34,7 @@ fn get_buckets(s: &[u8], bkt: &mut [u32], n: u32, k: u32, end: bool) {
             sum.wrapping_sub(bkt[i as usize])
         };
         i = i.wrapping_add(1);
-    };
+    }
 }
 
 fn put_suffix0(sa: &mut [u32], s: &[u8], bkt: &mut [u32], n: u32, k: u32, n1: i32) {
@@ -98,7 +97,9 @@ fn induce_sas0(sa: &mut [u32], s: &[u8], bkt: &mut [u32], n: u32, k: u32, suffix
     while i > 0 {
         if sa[i as usize] > 0 {
             j = sa[i as usize].wrapping_sub(1);
-            if (s[j as usize] <= s[j.wrapping_add(1) as usize]) && ((bkt[s[j as usize] as usize] as usize) < (i as usize)) {
+            if (s[j as usize] <= s[j.wrapping_add(1) as usize])
+                && ((bkt[s[j as usize] as usize] as usize) < (i as usize))
+            {
                 sa[bkt[s[j as usize] as usize] as usize] = j;
                 bkt[s[j as usize] as usize] = bkt[s[j as usize] as usize].wrapping_sub(1);
 
@@ -130,7 +131,8 @@ fn put_substr0(sa: &mut [u32], s: &[u8], bkt: &mut [u32], n: u32, k: u32) {
     succ_t = false; // s[n.wrapping_sub(2) as usize] must be L-type.
     i = n.wrapping_sub(2);
     while i > 0 {
-        cur_t = (s[(i - 1) as usize] < s[i as usize]) || (s[(i - 1) as usize] == s[i as usize]) && succ_t;
+        cur_t = (s[(i - 1) as usize] < s[i as usize])
+            || (s[(i - 1) as usize] == s[i as usize]) && succ_t;
 
         if !cur_t && succ_t {
             sa[bkt[s[i as usize] as usize] as usize] = i;
@@ -228,16 +230,18 @@ fn induce_sal1(sa: &mut [i32], s: &[i32], n: i32, suffix: bool) {
             d = EMPTY_I32;
         }
 
-        if d == EMPTY_I32 { // sa[c] is empty. 
+        if d == EMPTY_I32 {
+            // sa[c] is empty.
             if (c < n - 1) && (sa[(c + 1) as usize] == EMPTY_I32) {
                 sa[c as usize] = -1; // Init the counter.
                 sa[(c + 1) as usize] = j;
             } else {
                 sa[c as usize] = j; // A size-1 bucket.
             }
-        } else { // sa[c] is reused as a counter.
+        } else {
+            // sa[c] is reused as a counter.
             let mut pos: i32 = c - d + 1;
-            
+
             if (pos > (n - 1)) || (sa[pos as usize] != EMPTY_I32) {
                 // We are running into the right
                 // neighbor bucket.
@@ -277,7 +281,8 @@ fn induce_sal1(sa: &mut [i32], s: &[i32], n: i32, suffix: bool) {
     while i < n {
         j = sa[i as usize];
 
-        if (j < 0) && (j != EMPTY_I32) { // is sa[i] a counter?
+        if (j < 0) && (j != EMPTY_I32) {
+            // is sa[i] a counter?
             h = 0;
             while h < -j {
                 sa[(i + h) as usize] = sa[(i + h + 1) as usize];
@@ -347,14 +352,16 @@ fn induce_sas1(sa: &mut [i32], s: &[i32], n: i32, suffix: bool) {
             }
         }
 
-        if d == EMPTY_I32 { // sa[c] is empty.
+        if d == EMPTY_I32 {
+            // sa[c] is empty.
             if sa[(c - 1) as usize] == EMPTY_I32 {
                 sa[c as usize] -= 1; // Init the counter.
                 sa[(c - 1) as usize] = j;
             } else {
                 sa[c as usize] = j; // A size-1 bucket.
             }
-        } else { // sa[c] is reused as a counter.
+        } else {
+            // sa[c] is reused as a counter.
             let mut pos: i32 = c + d - 1;
 
             if sa[pos as usize] != EMPTY_I32 {
@@ -395,7 +402,8 @@ fn induce_sas1(sa: &mut [i32], s: &[i32], n: i32, suffix: bool) {
         while i > 0 {
             j = sa[i as usize];
 
-            if (j < 0) && (j != EMPTY_I32) { // is sa[i] a counter?
+            if (j < 0) && (j != EMPTY_I32) {
+                // is sa[i] a counter?
                 h = 0;
                 while h < -j {
                     sa[(i - h) as usize] = sa[(i - h - 1) as usize];
@@ -549,9 +557,7 @@ fn get_length_of_lms(s: &[u8], n: u32, level: i32, x: u32) -> u32 {
             // [u8] to [i32]
             let i32_slice: &[i32] = bytemuck::cast_slice(s);
 
-            *i32_slice
-                .get(x.wrapping_add(i) as usize)
-                .unwrap()
+            *i32_slice.get(x.wrapping_add(i) as usize).unwrap()
         }) > (if level == 0 {
             s[x.wrapping_add(i).wrapping_sub(1) as usize] as i32
         } else {
