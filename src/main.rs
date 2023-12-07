@@ -18,15 +18,16 @@ fn main() -> io::Result<()> {
     let input_path = &args[1];
     let output_path = &args[2];
 
-    // Open the input file and create a buffered reader
-    let input_file = File::open(input_path)?;
+    // Open the input file
+    let mut input_file = File::open(input_path)?;
     let metadata = input_file.metadata()?;
     let size = metadata.len();
     println!("Input file size {}", size);
 
-    let mut reader = BufReader::new(input_file);
-    let mut T = vec![0u8; (size + 1).try_into().unwrap()];
-    reader.read_exact(&mut T[..size.try_into().unwrap()])?;
+    let mut t = vec![];
+    input_file.read_to_end(&mut t)?;
+    t.append(&mut vec![0_u8]);
+    println!("{:?}", t);
 
     // Initialize suffix array
     let mut sa = vec![0u32; (size + 1).try_into().unwrap()];
@@ -34,9 +35,10 @@ fn main() -> io::Result<()> {
     // Measure time for constructing suffix array
     let start = Instant::now();
     saca_k(
-        &mut T,
+        Some(&mut t),
         &mut sa,
         (size + 1).try_into().unwrap(),
+        None,
         128,
         (size + 1).try_into().unwrap(),
         0,

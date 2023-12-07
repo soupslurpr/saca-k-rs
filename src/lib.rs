@@ -37,12 +37,33 @@ fn get_buckets(s: &[u8], bkt: &mut [u32], n: u32, k: u32, end: bool) {
     }
 }
 
-fn put_suffix0(sa: &mut [u32], s: &[u8], bkt: &mut [u32], n: u32, k: u32, n1: i32) {
+#[allow(clippy::too_many_arguments)]
+fn put_suffix0(
+    sa: &mut [u32],
+    s: Option<&[u8]>,
+    bkt: &mut [u32],
+    n: u32,
+    k: u32,
+    n1: i32,
+    n1_u32: Option<u32>,
+    m: Option<u32>,
+) {
     let mut i: u32;
     let mut j: u32;
 
     // Find the end of each bucket.
-    get_buckets(s, bkt, n, k, true);
+    get_buckets(
+        match s {
+            Some(s) => s,
+            None => bytemuck::cast_slice_mut::<u32, u8>(
+                &mut sa[(m.unwrap() - n1_u32.unwrap()) as usize..],
+            ),
+        },
+        bkt,
+        n,
+        k,
+        true,
+    );
 
     // Put the suffixes into their buckets.
     i = (n1 - 1) as u32;
@@ -50,8 +71,18 @@ fn put_suffix0(sa: &mut [u32], s: &[u8], bkt: &mut [u32], n: u32, k: u32, n1: i3
         j = sa[i as usize];
         sa[i as usize] = 0;
 
-        sa[bkt[s[j as usize] as usize] as usize] = j;
-        bkt[s[j as usize] as usize] = bkt[s[j as usize] as usize].wrapping_sub(1);
+        sa[bkt[match s {
+            Some(s) => &s,
+            None => bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1_u32.unwrap()) as usize..]),
+        }[j as usize] as usize] as usize] = j;
+        bkt[match s {
+            Some(s) => &s,
+            None => bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1_u32.unwrap()) as usize..]),
+        }[j as usize] as usize] = bkt[match s {
+            Some(s) => &s,
+            None => bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1_u32.unwrap()) as usize..]),
+        }[j as usize] as usize]
+            .wrapping_sub(1);
 
         i = i.wrapping_sub(1);
     }
@@ -59,12 +90,33 @@ fn put_suffix0(sa: &mut [u32], s: &[u8], bkt: &mut [u32], n: u32, k: u32, n1: i3
     sa[0] = n.wrapping_sub(1); // Set the single sentinel suffix.
 }
 
-fn induce_sal0(sa: &mut [u32], s: &[u8], bkt: &mut [u32], n: u32, k: u32, suffix: bool) {
+#[allow(clippy::too_many_arguments)]
+fn induce_sal0(
+    sa: &mut [u32],
+    s: Option<&[u8]>,
+    bkt: &mut [u32],
+    n: u32,
+    k: u32,
+    suffix: bool,
+    n1: Option<u32>,
+    m: Option<u32>,
+) {
     let mut i: u32;
     let mut j: u32;
 
     // Find the head of each bucket.
-    get_buckets(s, bkt, n, k, false);
+    get_buckets(
+        match s {
+            Some(s) => s,
+            None => {
+                bytemuck::cast_slice_mut::<u32, u8>(&mut sa[(m.unwrap() - n1.unwrap()) as usize..])
+            }
+        },
+        bkt,
+        n,
+        k,
+        false,
+    );
 
     bkt[0] = bkt[0].wrapping_add(1); // Skip the virtual sentinel.
 
@@ -72,9 +124,35 @@ fn induce_sal0(sa: &mut [u32], s: &[u8], bkt: &mut [u32], n: u32, k: u32, suffix
     while i < n {
         if sa[i as usize] > 0 {
             j = sa[i as usize].wrapping_sub(1);
-            if s[j as usize] >= s[(j + 1) as usize] {
-                sa[bkt[s[j as usize] as usize] as usize] = j;
-                bkt[s[j as usize] as usize] = bkt[s[j as usize] as usize].wrapping_add(1);
+            if match s {
+                Some(s) => &s,
+                None => bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..]),
+            }[j as usize]
+                >= match s {
+                    Some(s) => &s,
+                    None => {
+                        bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..])
+                    }
+                }[(j + 1) as usize]
+            {
+                sa[bkt[match s {
+                    Some(s) => &s,
+                    None => {
+                        bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..])
+                    }
+                }[j as usize] as usize] as usize] = j;
+                bkt[match s {
+                    Some(s) => &s,
+                    None => {
+                        bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..])
+                    }
+                }[j as usize] as usize] = bkt[match s {
+                    Some(s) => &s,
+                    None => {
+                        bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..])
+                    }
+                }[j as usize] as usize]
+                    .wrapping_add(1);
 
                 if !suffix && (i > 0) {
                     sa[i as usize] = 0;
@@ -86,22 +164,74 @@ fn induce_sal0(sa: &mut [u32], s: &[u8], bkt: &mut [u32], n: u32, k: u32, suffix
     }
 }
 
-fn induce_sas0(sa: &mut [u32], s: &[u8], bkt: &mut [u32], n: u32, k: u32, suffix: bool) {
+#[allow(clippy::too_many_arguments)]
+fn induce_sas0(
+    sa: &mut [u32],
+    s: Option<&[u8]>,
+    bkt: &mut [u32],
+    n: u32,
+    k: u32,
+    suffix: bool,
+    n1: Option<u32>,
+    m: Option<u32>,
+) {
     let mut i: u32;
     let mut j: u32;
 
     // Find the end of each bucket.
-    get_buckets(s, bkt, n, k, true);
+    get_buckets(
+        match s {
+            Some(s) => s,
+            None => {
+                bytemuck::cast_slice_mut::<u32, u8>(&mut sa[(m.unwrap() - n1.unwrap()) as usize..])
+            }
+        },
+        bkt,
+        n,
+        k,
+        true,
+    );
 
     i = n.wrapping_sub(1);
     while i > 0 {
         if sa[i as usize] > 0 {
             j = sa[i as usize].wrapping_sub(1);
-            if (s[j as usize] <= s[j.wrapping_add(1) as usize])
-                && ((bkt[s[j as usize] as usize] as usize) < (i as usize))
+            if (match s {
+                Some(s) => &s,
+                None => bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..]),
+            }[j as usize]
+                <= match s {
+                    Some(s) => &s,
+                    None => {
+                        bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..])
+                    }
+                }[j.wrapping_add(1) as usize])
+                && ((bkt[match s {
+                    Some(s) => &s,
+                    None => {
+                        bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..])
+                    }
+                }[j as usize] as usize] as usize)
+                    < (i as usize))
             {
-                sa[bkt[s[j as usize] as usize] as usize] = j;
-                bkt[s[j as usize] as usize] = bkt[s[j as usize] as usize].wrapping_sub(1);
+                sa[bkt[match s {
+                    Some(s) => &s,
+                    None => {
+                        bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..])
+                    }
+                }[j as usize] as usize] as usize] = j;
+                bkt[match s {
+                    Some(s) => &s,
+                    None => {
+                        bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..])
+                    }
+                }[j as usize] as usize] = bkt[match s {
+                    Some(s) => &s,
+                    None => {
+                        bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..])
+                    }
+                }[j as usize] as usize]
+                    .wrapping_sub(1);
 
                 if !suffix {
                     sa[i as usize] = 0;
@@ -113,13 +243,30 @@ fn induce_sas0(sa: &mut [u32], s: &[u8], bkt: &mut [u32], n: u32, k: u32, suffix
     }
 }
 
-fn put_substr0(sa: &mut [u32], s: &[u8], bkt: &mut [u32], n: u32, k: u32) {
+fn put_substr0(
+    sa: &mut [u32],
+    s: Option<&[u8]>,
+    bkt: &mut [u32],
+    n: u32,
+    k: u32,
+    n1: Option<u32>,
+    m: Option<u32>,
+) {
     let mut i: u32;
     let mut cur_t: bool;
     let mut succ_t: bool;
 
     // Find the end of each bucket.
-    get_buckets(s, bkt, n, k, true);
+    get_buckets(
+        match s {
+            Some(s) => s,
+            None => bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..]),
+        },
+        bkt,
+        n,
+        k,
+        true,
+    );
 
     // Set each item in sa as empty.
     i = 0;
@@ -131,12 +278,39 @@ fn put_substr0(sa: &mut [u32], s: &[u8], bkt: &mut [u32], n: u32, k: u32) {
     succ_t = false; // s[n.wrapping_sub(2) as usize] must be L-type.
     i = n.wrapping_sub(2);
     while i > 0 {
-        cur_t = (s[(i - 1) as usize] < s[i as usize])
-            || (s[(i - 1) as usize] == s[i as usize]) && succ_t;
+        cur_t = (match s {
+            Some(s) => &s,
+            None => bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..]),
+        }[(i - 1) as usize]
+            < match s {
+                Some(s) => &s,
+                None => bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..]),
+            }[i as usize])
+            || (match s {
+                Some(s) => &s,
+                None => bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..]),
+            }[(i - 1) as usize]
+                == match s {
+                    Some(s) => &s,
+                    None => {
+                        bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..])
+                    }
+                }[i as usize])
+                && succ_t;
 
         if !cur_t && succ_t {
-            sa[bkt[s[i as usize] as usize] as usize] = i;
-            bkt[s[i as usize] as usize] = bkt[s[i as usize] as usize].wrapping_sub(1);
+            sa[bkt[match s {
+                Some(s) => &s,
+                None => bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..]),
+            }[i as usize] as usize] as usize] = i;
+            bkt[match s {
+                Some(s) => &s,
+                None => bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..]),
+            }[i as usize] as usize] = bkt[match s {
+                Some(s) => &s,
+                None => bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..]),
+            }[i as usize] as usize]
+                .wrapping_sub(1);
         }
         succ_t = cur_t;
 
@@ -147,7 +321,7 @@ fn put_substr0(sa: &mut [u32], s: &[u8], bkt: &mut [u32], n: u32, k: u32) {
     sa[0] = n.wrapping_sub(1);
 }
 
-fn put_suffix1(sa: &mut [i32], s: &[i32], n1: i32) {
+fn put_suffix1(sa: &mut [u32], s: Option<&[u8]>, n1: i32, n1_u32: Option<u32>, m: Option<u32>) {
     let mut i: i32;
     let mut j: i32;
     let mut pos: i32 = 0; // In the original code, pos seems to be left uninitialized.
@@ -156,41 +330,61 @@ fn put_suffix1(sa: &mut [i32], s: &[i32], n1: i32) {
 
     i = n1 - 1;
     while i > 0 {
-        j = sa[i as usize];
-        sa[i as usize] = EMPTY_I32;
+        j = bytemuck::cast_slice_mut::<u32, i32>(sa)[i as usize];
+        bytemuck::cast_slice_mut::<u32, i32>(sa)[i as usize] = EMPTY_I32;
 
-        cur = s[j as usize];
+        cur = bytemuck::cast_slice::<u8, i32>(match s {
+            Some(s) => s,
+            None => bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1_u32.unwrap()) as usize..]),
+        })[j as usize];
 
         if cur != pre {
             pre = cur;
             pos = cur;
         }
 
-        sa[pos as usize] = j;
+        bytemuck::cast_slice_mut::<u32, i32>(sa)[pos as usize] = j;
         pos -= 1;
 
         i -= 1;
     }
 }
 
-fn induce_sal1(sa: &mut [i32], s: &[i32], n: i32, suffix: bool) {
+fn induce_sal1(
+    sa: &mut [u32],
+    s: Option<&[u8]>,
+    n: i32,
+    suffix: bool,
+    n1: Option<u32>,
+    m: Option<u32>,
+) {
     let mut h: i32;
     let mut i: i32;
     let mut j: i32;
-    let mut step: i32 = 1;
+    let mut step: i32;
 
     i = 0;
     while i < n {
         step = 1;
-        j = sa[i as usize] - 1;
+        j = bytemuck::cast_slice_mut::<u32, i32>(sa)[i as usize] - 1;
 
-        if sa[i as usize] <= 0 {
+        if bytemuck::cast_slice_mut::<u32, i32>(sa)[i as usize] <= 0 {
             i += step;
             continue;
         }
 
-        let c: i32 = s[j as usize];
-        let c1: i32 = s[(j + 1) as usize];
+        let c: i32 = bytemuck::cast_slice::<u8, i32>(match s {
+            Some(s) => s,
+            None => {
+                bytemuck::cast_slice_mut::<u32, u8>(&mut sa[(m.unwrap() - n1.unwrap()) as usize..])
+            }
+        })[j as usize];
+        let c1: i32 = bytemuck::cast_slice::<u8, i32>(match s {
+            Some(s) => s,
+            None => {
+                bytemuck::cast_slice_mut::<u32, u8>(&mut sa[(m.unwrap() - n1.unwrap()) as usize..])
+            }
+        })[(j + 1) as usize];
 
         let is_l: bool = c >= c1;
 
@@ -201,7 +395,7 @@ fn induce_sal1(sa: &mut [i32], s: &[i32], n: i32, suffix: bool) {
 
         // s[j] is L-type.
 
-        let mut d: i32 = sa[c as usize];
+        let mut d: i32 = bytemuck::cast_slice_mut::<u32, i32>(sa)[c as usize];
         if d >= 0 {
             // sa[c] is borrowed by the left
             // neighbor bucket.
@@ -210,18 +404,20 @@ fn induce_sal1(sa: &mut [i32], s: &[i32], n: i32, suffix: bool) {
             let mut foo: i32;
             let mut bar: i32;
 
-            foo = sa[c as usize];
+            foo = bytemuck::cast_slice_mut::<u32, i32>(sa)[c as usize];
 
             h = c - 1;
-            while sa[h as usize] >= 0 || sa[h as usize] == EMPTY_I32 {
-                bar = sa[h as usize];
-                sa[h as usize] = foo;
+            while bytemuck::cast_slice_mut::<u32, i32>(sa)[h as usize] >= 0
+                || bytemuck::cast_slice_mut::<u32, i32>(sa)[h as usize] == EMPTY_I32
+            {
+                bar = bytemuck::cast_slice_mut::<u32, i32>(sa)[h as usize];
+                bytemuck::cast_slice_mut::<u32, i32>(sa)[h as usize] = foo;
                 foo = bar;
 
                 h -= 1;
             }
 
-            sa[h as usize] = foo;
+            bytemuck::cast_slice_mut::<u32, i32>(sa)[h as usize] = foo;
 
             if h < i {
                 step = 0;
@@ -232,24 +428,29 @@ fn induce_sal1(sa: &mut [i32], s: &[i32], n: i32, suffix: bool) {
 
         if d == EMPTY_I32 {
             // sa[c] is empty.
-            if (c < n - 1) && (sa[(c + 1) as usize] == EMPTY_I32) {
-                sa[c as usize] = -1; // Init the counter.
-                sa[(c + 1) as usize] = j;
+            if (c < n - 1)
+                && (bytemuck::cast_slice_mut::<u32, i32>(sa)[(c + 1) as usize] == EMPTY_I32)
+            {
+                bytemuck::cast_slice_mut::<u32, i32>(sa)[c as usize] = -1; // Init the counter.
+                bytemuck::cast_slice_mut::<u32, i32>(sa)[(c + 1) as usize] = j;
             } else {
-                sa[c as usize] = j; // A size-1 bucket.
+                bytemuck::cast_slice_mut::<u32, i32>(sa)[c as usize] = j; // A size-1 bucket.
             }
         } else {
             // sa[c] is reused as a counter.
             let mut pos: i32 = c - d + 1;
 
-            if (pos > (n - 1)) || (sa[pos as usize] != EMPTY_I32) {
+            if (pos > (n - 1))
+                || (bytemuck::cast_slice_mut::<u32, i32>(sa)[pos as usize] != EMPTY_I32)
+            {
                 // We are running into the right
                 // neighbor bucket.
                 // Shift-left one step the items
                 // of bucket(sa, s, j).
                 h = 0;
                 while h < -d {
-                    sa[(c + h) as usize] = sa[(c + h + 1) as usize];
+                    bytemuck::cast_slice_mut::<u32, i32>(sa)[(c + h) as usize] =
+                        bytemuck::cast_slice_mut::<u32, i32>(sa)[(c + h + 1) as usize];
                     h += 1;
                 }
 
@@ -259,18 +460,23 @@ fn induce_sal1(sa: &mut [i32], s: &[i32], n: i32, suffix: bool) {
                     step = 0;
                 }
             } else {
-                sa[c as usize] -= 1;
+                bytemuck::cast_slice_mut::<u32, i32>(sa)[c as usize] -= 1;
             }
 
-            sa[pos as usize] = j;
+            bytemuck::cast_slice_mut::<u32, i32>(sa)[pos as usize] = j;
         }
 
-        let c2: i32 = s[(j + 2) as usize];
+        let c2: i32 = bytemuck::cast_slice::<u8, i32>(match s {
+            Some(s) => s,
+            None => {
+                bytemuck::cast_slice_mut::<u32, u8>(&mut sa[(m.unwrap() - n1.unwrap()) as usize..])
+            }
+        })[(j + 2) as usize];
         let is_l1: bool = (j + 1 < n - 1) && (c1 > c2) || ((c1 == c2) && (c1 < i)); // Is s[sa[i]] L-type?
 
         if (!suffix || !is_l1) && (i > 0) {
             let i1: i32 = if step == 0 { i - 1 } else { i };
-            sa[i1 as usize] = EMPTY_I32;
+            bytemuck::cast_slice_mut::<u32, i32>(sa)[i1 as usize] = EMPTY_I32;
         }
         i += step;
     }
@@ -279,40 +485,58 @@ fn induce_sal1(sa: &mut [i32], s: &[i32], n: i32, suffix: bool) {
     // with its head being reused as a counter.
     i = 1;
     while i < n {
-        j = sa[i as usize];
+        j = bytemuck::cast_slice_mut::<u32, i32>(sa)[i as usize];
 
         if (j < 0) && (j != EMPTY_I32) {
             // is sa[i] a counter?
             h = 0;
             while h < -j {
-                sa[(i + h) as usize] = sa[(i + h + 1) as usize];
+                bytemuck::cast_slice_mut::<u32, i32>(sa)[(i + h) as usize] =
+                    bytemuck::cast_slice_mut::<u32, i32>(sa)[(i + h + 1) as usize];
                 h += 1;
             }
-            sa[(i + h) as usize] = EMPTY_I32;
+            bytemuck::cast_slice_mut::<u32, i32>(sa)[(i + h) as usize] = EMPTY_I32;
         }
         i += 1
     }
 }
 
-fn induce_sas1(sa: &mut [i32], s: &[i32], n: i32, suffix: bool) {
+fn induce_sas1(
+    sa: &mut [u32],
+    s: Option<&[u8]>,
+    n: i32,
+    suffix: bool,
+    n1: Option<u32>,
+    m: Option<u32>,
+) {
     let mut h: i32;
     let mut i: i32;
     let mut j: i32;
-    let mut step: i32 = 1;
+    let mut step: i32;
 
     i = n - 1;
     while i > 0 {
         step = 1;
-        j = sa[i as usize] - 1;
+        j = bytemuck::cast_slice_mut::<u32, i32>(sa)[i as usize] - 1;
 
-        if sa[i as usize] <= 0 {
+        if bytemuck::cast_slice_mut::<u32, i32>(sa)[i as usize] <= 0 {
             i -= step;
             continue;
         }
 
-        let c: i32 = s[j as usize];
+        let c: i32 = bytemuck::cast_slice::<u8, i32>(match s {
+            Some(s) => s,
+            None => {
+                bytemuck::cast_slice_mut::<u32, u8>(&mut sa[(m.unwrap() - n1.unwrap()) as usize..])
+            }
+        })[j as usize];
 
-        let c1: i32 = s[(j + 1) as usize];
+        let c1: i32 = bytemuck::cast_slice::<u8, i32>(match s {
+            Some(s) => s,
+            None => {
+                bytemuck::cast_slice_mut::<u32, u8>(&mut sa[(m.unwrap() - n1.unwrap()) as usize..])
+            }
+        })[(j + 1) as usize];
 
         let is_s: bool = (c < c1) || ((c == c1) && (c > i));
 
@@ -323,7 +547,7 @@ fn induce_sas1(sa: &mut [i32], s: &[i32], n: i32, suffix: bool) {
 
         // s[j] is S-type.
 
-        let d: i32 = sa[c as usize];
+        let d: i32 = bytemuck::cast_slice_mut::<u32, i32>(sa)[c as usize];
 
         if d >= 0 {
             // sa[c] is borrowed by the right
@@ -333,19 +557,21 @@ fn induce_sas1(sa: &mut [i32], s: &[i32], n: i32, suffix: bool) {
             let mut foo: i32;
             let mut bar: i32;
 
-            foo = sa[c as usize];
+            foo = bytemuck::cast_slice_mut::<u32, i32>(sa)[c as usize];
 
             h = c + 1;
 
-            while sa[h as usize] >= 0 || sa[h as usize] == EMPTY_I32 {
-                bar = sa[h as usize];
-                sa[h as usize] = foo;
+            while bytemuck::cast_slice_mut::<u32, i32>(sa)[h as usize] >= 0
+                || bytemuck::cast_slice_mut::<u32, i32>(sa)[h as usize] == EMPTY_I32
+            {
+                bar = bytemuck::cast_slice_mut::<u32, i32>(sa)[h as usize];
+                bytemuck::cast_slice_mut::<u32, i32>(sa)[h as usize] = foo;
                 foo = bar;
 
                 h += 1;
             }
 
-            sa[h as usize] = foo;
+            bytemuck::cast_slice_mut::<u32, i32>(sa)[h as usize] = foo;
 
             if h > i {
                 step = 0;
@@ -354,24 +580,25 @@ fn induce_sas1(sa: &mut [i32], s: &[i32], n: i32, suffix: bool) {
 
         if d == EMPTY_I32 {
             // sa[c] is empty.
-            if sa[(c - 1) as usize] == EMPTY_I32 {
-                sa[c as usize] -= 1; // Init the counter.
-                sa[(c - 1) as usize] = j;
+            if bytemuck::cast_slice_mut::<u32, i32>(sa)[(c - 1) as usize] == EMPTY_I32 {
+                bytemuck::cast_slice_mut::<u32, i32>(sa)[c as usize] -= 1; // Init the counter.
+                bytemuck::cast_slice_mut::<u32, i32>(sa)[(c - 1) as usize] = j;
             } else {
-                sa[c as usize] = j; // A size-1 bucket.
+                bytemuck::cast_slice_mut::<u32, i32>(sa)[c as usize] = j; // A size-1 bucket.
             }
         } else {
             // sa[c] is reused as a counter.
             let mut pos: i32 = c + d - 1;
 
-            if sa[pos as usize] != EMPTY_I32 {
+            if bytemuck::cast_slice_mut::<u32, i32>(sa)[pos as usize] != EMPTY_I32 {
                 // We are running into the left
                 // neighbor bucket.
                 // Shift-right one step the items
                 // of bucket(sa, s, j).
                 h = 0;
                 while h < -d {
-                    sa[(c - h) as usize] = sa[(c - h - 1) as usize];
+                    bytemuck::cast_slice_mut::<u32, i32>(sa)[(c - h) as usize] =
+                        bytemuck::cast_slice_mut::<u32, i32>(sa)[(c - h - 1) as usize];
                     h += 1;
                 }
 
@@ -381,15 +608,15 @@ fn induce_sas1(sa: &mut [i32], s: &[i32], n: i32, suffix: bool) {
                     step = 0;
                 }
             } else {
-                sa[c as usize] -= 1;
+                bytemuck::cast_slice_mut::<u32, i32>(sa)[c as usize] -= 1;
             }
 
-            sa[pos as usize] = j;
+            bytemuck::cast_slice_mut::<u32, i32>(sa)[pos as usize] = j;
         }
 
         if !suffix {
             let i1: i32 = if step == 0 { i + 1 } else { i };
-            sa[i1 as usize] = EMPTY_I32;
+            bytemuck::cast_slice_mut::<u32, i32>(sa)[i1 as usize] = EMPTY_I32;
         }
 
         i -= step;
@@ -400,16 +627,17 @@ fn induce_sas1(sa: &mut [i32], s: &[i32], n: i32, suffix: bool) {
     if !suffix {
         i = n - 1;
         while i > 0 {
-            j = sa[i as usize];
+            j = bytemuck::cast_slice_mut::<u32, i32>(sa)[i as usize];
 
             if (j < 0) && (j != EMPTY_I32) {
                 // is sa[i] a counter?
                 h = 0;
                 while h < -j {
-                    sa[(i - h) as usize] = sa[(i - h - 1) as usize];
+                    bytemuck::cast_slice_mut::<u32, i32>(sa)[(i - h) as usize] =
+                        bytemuck::cast_slice_mut::<u32, i32>(sa)[(i - h - 1) as usize];
                     h += 1;
                 }
-                sa[(i - h) as usize] = EMPTY_I32;
+                bytemuck::cast_slice_mut::<u32, i32>(sa)[(i - h) as usize] = EMPTY_I32;
             }
 
             i -= 1;
@@ -417,18 +645,21 @@ fn induce_sas1(sa: &mut [i32], s: &[i32], n: i32, suffix: bool) {
     }
 }
 
-fn put_substr1(sa: &mut [i32], s: &[i32], n: i32) {
-    let mut h: i32 = 0;
+fn put_substr1(sa: &mut [u32], s: Option<&[u8]>, n: i32, n1: Option<u32>, m: Option<u32>) {
+    let mut h: i32;
     let mut i: i32 = 0;
-    let mut j: i32 = 0;
+    let mut j: i32;
 
     while i < n {
-        sa[i as usize] = EMPTY_I32;
+        bytemuck::cast_slice_mut::<u32, i32>(sa)[i as usize] = EMPTY_I32;
         i += 1;
     }
 
     let mut c: i32;
-    let mut c1: i32 = s[(n - 2) as usize];
+    let mut c1: i32 = bytemuck::cast_slice::<u8, i32>(match s {
+        Some(s) => s,
+        None => bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..]),
+    })[(n - 2) as usize];
     let mut t: bool;
     let mut t1: bool = false;
 
@@ -437,12 +668,15 @@ fn put_substr1(sa: &mut [i32], s: &[i32], n: i32) {
         c = c1;
         t = t1;
 
-        c1 = s[(i - 1) as usize];
+        c1 = bytemuck::cast_slice::<u8, i32>(match s {
+            Some(s) => s,
+            None => bytemuck::cast_slice::<u32, u8>(&sa[(m.unwrap() - n1.unwrap()) as usize..]),
+        })[(i - 1) as usize];
         t1 = (c1 < c) || ((c1 == c) && t);
 
         #[allow(clippy::collapsible_if)]
         if t && !t1 {
-            if sa[c as usize] >= 0 {
+            if bytemuck::cast_slice_mut::<u32, i32>(sa)[c as usize] >= 0 {
                 // sa[c] is borrowed by the right
                 // neighbor bucket.
                 // Shift-right the items in the
@@ -450,48 +684,49 @@ fn put_substr1(sa: &mut [i32], s: &[i32], n: i32) {
                 let mut foo: i32;
                 let mut bar: i32;
 
-                foo = sa[c as usize];
+                foo = bytemuck::cast_slice_mut::<u32, i32>(sa)[c as usize];
                 h = c + 1;
-                while sa[h as usize] >= 0 {
-                    bar = sa[h as usize];
-                    sa[h as usize] = foo;
+                while bytemuck::cast_slice_mut::<u32, i32>(sa)[h as usize] >= 0 {
+                    bar = bytemuck::cast_slice_mut::<u32, i32>(sa)[h as usize];
+                    bytemuck::cast_slice_mut::<u32, i32>(sa)[h as usize] = foo;
                     foo = bar;
                     h += 1;
                 }
 
-                sa[h as usize] = foo;
+                bytemuck::cast_slice_mut::<u32, i32>(sa)[h as usize] = foo;
 
-                sa[c as usize] = EMPTY_I32;
+                bytemuck::cast_slice_mut::<u32, i32>(sa)[c as usize] = EMPTY_I32;
             }
 
-            let d = sa[c as usize];
+            let d = bytemuck::cast_slice_mut::<u32, i32>(sa)[c as usize];
             if d == EMPTY_I32 {
                 // sa[c] is empty.
-                if sa[(c - 1) as usize] == EMPTY_I32 {
-                    sa[c as usize] = -1; // Init the counter.
-                    sa[(c - 1) as usize] = i;
+                if bytemuck::cast_slice_mut::<u32, i32>(sa)[(c - 1) as usize] == EMPTY_I32 {
+                    bytemuck::cast_slice_mut::<u32, i32>(sa)[c as usize] = -1; // Init the counter.
+                    bytemuck::cast_slice_mut::<u32, i32>(sa)[(c - 1) as usize] = i;
                 } else {
-                    sa[c as usize] = i; // A size-1 bucket.
+                    bytemuck::cast_slice_mut::<u32, i32>(sa)[c as usize] = i; // A size-1 bucket.
                 }
             } else {
                 // sa[c] is reused as a counter
                 let mut pos = c + d - 1;
 
-                if sa[pos as usize] != EMPTY_I32 {
+                if bytemuck::cast_slice_mut::<u32, i32>(sa)[pos as usize] != EMPTY_I32 {
                     // We are running into the left
                     // neighbor bucket.
                     // Shift-right one step the items
                     // of bucket(sa, s, i).
                     h = 0;
                     while h < -d {
-                        sa[(c - h) as usize] = sa[(c - h - 1) as usize];
+                        bytemuck::cast_slice_mut::<u32, i32>(sa)[(c - h) as usize] =
+                            bytemuck::cast_slice_mut::<u32, i32>(sa)[(c - h - 1) as usize];
                         h += 1
                     }
                     pos += 1;
                 } else {
-                    sa[c as usize] -= 1;
+                    bytemuck::cast_slice_mut::<u32, i32>(sa)[c as usize] -= 1;
                 }
-                sa[pos as usize] = i;
+                bytemuck::cast_slice_mut::<u32, i32>(sa)[pos as usize] = i;
             }
         }
         i -= 1;
@@ -501,23 +736,24 @@ fn put_substr1(sa: &mut [i32], s: &[i32], n: i32) {
     // with its head being reused as a counter.
     i = n - 1;
     while i > 0 {
-        j = sa[i as usize];
+        j = bytemuck::cast_slice_mut::<u32, i32>(sa)[i as usize];
 
         if (j < 0) && (j != EMPTY_I32) {
             // Is sa[i] a counter?
             h = 0;
             while h < -j {
-                sa[(i - h) as usize] = sa[(i - h - 1) as usize];
+                bytemuck::cast_slice_mut::<u32, i32>(sa)[(i - h) as usize] =
+                    bytemuck::cast_slice_mut::<u32, i32>(sa)[(i - h - 1) as usize];
                 h += 1;
             }
-            sa[(i - h) as usize] = EMPTY_I32;
+            bytemuck::cast_slice_mut::<u32, i32>(sa)[(i - h) as usize] = EMPTY_I32;
         }
 
         i -= 1;
     }
 
     // Put the single sentinel LMS-substring.
-    sa[0] = n - 1;
+    bytemuck::cast_slice_mut::<u32, i32>(sa)[0] = n - 1;
 }
 
 fn get_length_of_lms(s: &[u8], n: u32, level: i32, x: u32) -> u32 {
@@ -595,15 +831,7 @@ fn get_length_of_lms(s: &[u8], n: u32, level: i32, x: u32) -> u32 {
     dist.wrapping_add(1)
 }
 
-fn name_substr(
-    sa: &mut [u32],
-    s: &[u8],
-    s1: &mut [u32],
-    n: u32,
-    m: u32,
-    n1: u32,
-    level: i32,
-) -> u32 {
+fn name_substr(sa: &mut [u32], s: Option<&[u8]>, n: u32, m: u32, n1: u32, level: i32) -> u32 {
     let mut i: u32;
     let mut j: u32;
     let mut cur_t: u32;
@@ -626,7 +854,15 @@ fn name_substr(
         let mut diff: bool = false;
         let pos: u32 = sa[i as usize];
 
-        let len: u32 = get_length_of_lms(s, n, level, pos);
+        let len: u32 = get_length_of_lms(
+            match s {
+                Some(s) => s,
+                None => bytemuck::cast_slice_mut::<u32, u8>(&mut sa[(m - n1) as usize..]),
+            },
+            n,
+            level,
+            pos,
+        );
 
         if len != pre_len {
             diff = true;
@@ -636,17 +872,29 @@ fn name_substr(
                 if pos.wrapping_add(d) == n.wrapping_sub(1)
                     || pre_pos.wrapping_add(d) == n.wrapping_sub(1)
                     || (if level == 0 {
-                        s[pos.wrapping_add(d) as usize] as i32
+                        (match s {
+                            Some(ref s) => &s,
+                            None => bytemuck::cast_slice::<u32, u8>(&sa[(m - n1) as usize..]),
+                        })[pos.wrapping_add(d) as usize] as i32
                     } else {
                         // [u8] to [i32]
-                        let i32_slice: &[i32] = bytemuck::cast_slice(s);
+                        let i32_slice: &[i32] = bytemuck::cast_slice(match s {
+                            Some(s) => s,
+                            None => bytemuck::cast_slice::<u32, u8>(&sa[(m - n1) as usize..]),
+                        });
 
                         *i32_slice.get(pos.wrapping_add(d) as usize).unwrap()
                     }) != (if level == 0 {
-                        s[pre_pos.wrapping_add(d) as usize] as i32
+                        (match s {
+                            Some(ref s) => &s,
+                            None => bytemuck::cast_slice::<u32, u8>(&sa[(m - n1) as usize..]),
+                        })[pre_pos.wrapping_add(d) as usize] as i32
                     } else {
                         // [u8] to [i32]
-                        let i32_slice: &[i32] = bytemuck::cast_slice(s);
+                        let i32_slice: &[i32] = bytemuck::cast_slice(match s {
+                            Some(s) => s,
+                            None => bytemuck::cast_slice::<u32, u8>(&sa[(m - n1) as usize..]),
+                        });
 
                         *i32_slice.get(pre_pos.wrapping_add(d) as usize).unwrap()
                     })
@@ -689,8 +937,8 @@ fn name_substr(
     succ_t = 1;
     i = n1.wrapping_sub(1);
     while i > 0 {
-        let ch = s1[i as usize];
-        let ch1 = s1[i.wrapping_sub(1) as usize];
+        let ch = sa[(m - n1) as usize..][i as usize];
+        let ch1 = sa[(m - n1) as usize..][i.wrapping_sub(1) as usize];
 
         cur_t = if ch1 < ch || ((ch1 == ch) && (succ_t == 1)) {
             1
@@ -699,8 +947,11 @@ fn name_substr(
         };
 
         if cur_t == 1 {
-            s1[i.wrapping_sub(1) as usize] = s1[i.wrapping_sub(1) as usize]
-                .wrapping_add(sa[s1[i.wrapping_sub(1) as usize] as usize].wrapping_sub(1));
+            sa[(m - n1) as usize..][i.wrapping_sub(1) as usize] =
+                sa[(m - n1) as usize..][i.wrapping_sub(1) as usize].wrapping_add(
+                    sa[sa[(m - n1) as usize..][i.wrapping_sub(1) as usize] as usize]
+                        .wrapping_sub(1),
+                );
         }
         succ_t = cur_t;
         i = i.wrapping_sub(1);
@@ -709,7 +960,7 @@ fn name_substr(
     name_ctr
 }
 
-fn get_sa_lms(sa: &mut [u32], s: &mut [u8], s1: &mut [u32], n: u32, n1: u32, level: i32) {
+fn get_sa_lms(sa: &mut [u32], s: Option<&[u8]>, m: u32, n: u32, n1: u32, level: i32) {
     let mut i: u32;
     let mut j: u32;
     let mut cur_t: u32;
@@ -717,7 +968,7 @@ fn get_sa_lms(sa: &mut [u32], s: &mut [u8], s1: &mut [u32], n: u32, n1: u32, lev
 
     j = n1.wrapping_sub(1);
 
-    s1[j as usize] = n.wrapping_sub(1);
+    sa[(m - n1) as usize..][j as usize] = n.wrapping_sub(1);
     j = j.wrapping_sub(1);
 
     succ_t = 0; // s[n.wrapping_sub(2) must be L-type
@@ -725,31 +976,55 @@ fn get_sa_lms(sa: &mut [u32], s: &mut [u8], s1: &mut [u32], n: u32, n1: u32, lev
     i = n.wrapping_sub(2);
     while i > 0 {
         cur_t = if ((if level == 0 {
-            s[i.wrapping_sub(1) as usize] as i32
+            (match s {
+                Some(s) => &s,
+                None => bytemuck::cast_slice::<u32, u8>(&sa[(m - n1) as usize..]),
+            })[i.wrapping_sub(1) as usize] as i32
         } else {
             // [u8] to [i32]
-            let i32_slice: &[i32] = bytemuck::cast_slice(s);
+            let i32_slice: &[i32] = bytemuck::cast_slice(match s {
+                Some(s) => s,
+                None => bytemuck::cast_slice::<u32, u8>(&sa[(m - n1) as usize..]),
+            });
 
             *i32_slice.get(i.wrapping_sub(1) as usize).unwrap()
         }) < (if level == 0 {
-            s[i as usize] as i32
+            (match s {
+                Some(s) => &s,
+                None => bytemuck::cast_slice::<u32, u8>(&sa[(m - n1) as usize..]),
+            })[i as usize] as i32
         } else {
             // [u8] to [i32]
-            let i32_slice: &[i32] = bytemuck::cast_slice(s);
+            let i32_slice: &[i32] = bytemuck::cast_slice(match s {
+                Some(s) => s,
+                None => bytemuck::cast_slice::<u32, u8>(&sa[(m - n1) as usize..]),
+            });
 
             *i32_slice.get(i as usize).unwrap()
         })) || ((if level == 0 {
-            s[i.wrapping_sub(1) as usize] as i32
+            (match s {
+                Some(s) => &s,
+                None => bytemuck::cast_slice::<u32, u8>(&sa[(m - n1) as usize..]),
+            })[i.wrapping_sub(1) as usize] as i32
         } else {
             // [u8] to [i32]
-            let i32_slice: &[i32] = bytemuck::cast_slice(s);
+            let i32_slice: &[i32] = bytemuck::cast_slice(match s {
+                Some(s) => s,
+                None => bytemuck::cast_slice::<u32, u8>(&sa[(m - n1) as usize..]),
+            });
 
             *i32_slice.get(i.wrapping_sub(1) as usize).unwrap()
         }) == (if level == 0 {
-            s[i as usize] as i32
+            (match s {
+                Some(s) => s,
+                None => bytemuck::cast_slice::<u32, u8>(&sa[(m - n1) as usize..]),
+            })[i as usize] as i32
         } else {
             // [u8] to [i32]
-            let i32_slice: &[i32] = bytemuck::cast_slice(s);
+            let i32_slice: &[i32] = bytemuck::cast_slice(match s {
+                Some(s) => s,
+                None => bytemuck::cast_slice::<u32, u8>(&sa[(m - n1) as usize..]),
+            });
 
             *i32_slice.get(i as usize).unwrap()
         }) && (succ_t == 1))
@@ -760,7 +1035,7 @@ fn get_sa_lms(sa: &mut [u32], s: &mut [u8], s1: &mut [u32], n: u32, n1: u32, lev
         };
 
         if (cur_t == 0) && (succ_t == 1) {
-            s1[j as usize] = i;
+            sa[(m - n1) as usize..][j as usize] = i;
             j = j.wrapping_sub(1);
         }
 
@@ -771,7 +1046,7 @@ fn get_sa_lms(sa: &mut [u32], s: &mut [u8], s1: &mut [u32], n: u32, n1: u32, lev
 
     i = 0;
     while i < n1 {
-        sa[i as usize] = s1[sa[i as usize] as usize];
+        sa[i as usize] = sa[(m - n1) as usize..][sa[i as usize] as usize];
         i = i.wrapping_add(1);
     }
 
@@ -783,7 +1058,15 @@ fn get_sa_lms(sa: &mut [u32], s: &mut [u8], s1: &mut [u32], n: u32, n1: u32, lev
     }
 }
 
-pub fn saca_k(s: &mut [u8], sa: &mut [u32], n: u32, k: u32, m: u32, level: i32) {
+pub fn saca_k(
+    s: Option<&mut [u8]>,
+    sa: &mut [u32],
+    n: u32,
+    n1: Option<u32>,
+    k: u32,
+    m: u32,
+    level: i32,
+) {
     let mut i;
     let mut bkt = vec![];
 
@@ -792,26 +1075,26 @@ pub fn saca_k(s: &mut [u8], sa: &mut [u32], n: u32, k: u32, m: u32, level: i32) 
         let size = std::mem::size_of::<i32>().wrapping_mul(k as usize);
         bkt = vec![0; size];
 
-        put_substr0(sa, s, &mut bkt, n, k);
-        induce_sal0(sa, s, &mut bkt, n, k, false);
-        induce_sas0(sa, s, &mut bkt, n, k, false);
+        put_substr0(sa, s.as_deref(), &mut bkt, n, k, n1, Some(m));
+        induce_sal0(sa, s.as_deref(), &mut bkt, n, k, false, n1, Some(m));
+        induce_sas0(sa, s.as_deref(), &mut bkt, n, k, false, n1, Some(m));
     } else {
-        put_substr1(
-            bytemuck::cast_slice_mut::<u32, i32>(sa),
-            bytemuck::cast_slice::<u8, i32>(s),
-            bytemuck::cast::<u32, i32>(n),
-        );
+        put_substr1(sa, s.as_deref(), bytemuck::cast::<u32, i32>(n), n1, Some(m));
         induce_sal1(
-            bytemuck::cast_slice_mut::<u32, i32>(sa),
-            bytemuck::cast_slice::<u8, i32>(s),
+            sa,
+            s.as_deref(),
             bytemuck::cast::<u32, i32>(n),
             false,
+            n1,
+            Some(m),
         );
         induce_sas1(
-            bytemuck::cast_slice_mut::<u32, i32>(sa),
-            bytemuck::cast_slice::<u8, i32>(s),
+            sa,
+            s.as_deref(),
             bytemuck::cast::<u32, i32>(n),
             false,
+            n1,
+            Some(m),
         );
     }
 
@@ -834,18 +1117,19 @@ pub fn saca_k(s: &mut [u8], sa: &mut [u32], n: u32, k: u32, m: u32, level: i32) 
         i = i.wrapping_add(1);
     }
 
-    let mut sa1: Vec<u32> = sa.to_vec();
-    let mut s1 = sa[(m - n1) as usize..].to_vec(); // Unsure if this is a correct translation.
-    let name_ctr = name_substr(sa, s, &mut s1, n, m, n1, level);
+    // let mut sa1 = sa;
+    // let mut s1 = &mut sa[(m - n1) as usize..]; // Unsure if this is a correct translation.
+    let name_ctr = name_substr(sa, s.as_deref(), n, m, n1, level);
 
     // Stage 2: Solve the reduced problem.
 
     // Recurse if names are not yet unique.
     if name_ctr < n1 {
         saca_k(
-            bytemuck::cast_slice_mut::<u32, u8>(&mut s1),
-            &mut sa1,
-            n1,
+            None, // bytemuck::cast_slice_mut::<u32, u8>(&mut sa[(m - n1) as usize..]),
+            sa,
+            n,
+            Some(n1),
             0,
             m.wrapping_sub(n1),
             level + 1,
@@ -854,36 +1138,51 @@ pub fn saca_k(s: &mut [u8], sa: &mut [u32], n: u32, k: u32, m: u32, level: i32) 
         // get the suffix array of s1 directly.
         i = 0;
         while i < n1 {
-            sa1[s1[i as usize] as usize] = i;
+            sa[sa[(m - n1) as usize..][i as usize] as usize] = i;
             i = i.wrapping_add(1);
         }
     }
 
     // Stage 3: Induce sa(s) from sa(s1).
 
-    get_sa_lms(sa, s, &mut s1, n, n1, level);
+    get_sa_lms(sa, s.as_deref(), m, n, n1, level);
 
     if level == 0 {
-        put_suffix0(sa, s, &mut bkt, n, k, bytemuck::cast::<u32, i32>(n1));
-        induce_sal0(sa, s, &mut bkt, n, k, true);
-        induce_sas0(sa, s, &mut bkt, n, k, true);
+        put_suffix0(
+            sa,
+            s.as_deref(),
+            &mut bkt,
+            n,
+            k,
+            bytemuck::cast::<u32, i32>(n1),
+            Some(n1),
+            Some(m),
+        );
+        induce_sal0(sa, s.as_deref(), &mut bkt, n, k, true, Some(n1), Some(m));
+        induce_sas0(sa, s.as_deref(), &mut bkt, n, k, true, Some(n1), Some(m));
     } else {
         put_suffix1(
-            bytemuck::cast_slice_mut::<u32, i32>(sa),
-            bytemuck::cast_slice_mut::<u8, i32>(s),
+            sa,
+            s.as_deref(),
             bytemuck::cast::<u32, i32>(n1),
+            Some(n1),
+            Some(m),
         );
         induce_sal1(
-            bytemuck::cast_slice_mut::<u32, i32>(sa),
-            bytemuck::cast_slice_mut::<u8, i32>(s),
+            sa,
+            s.as_deref(),
             bytemuck::cast::<u32, i32>(n),
             true,
+            Some(n1),
+            Some(m),
         );
         induce_sas1(
-            bytemuck::cast_slice_mut::<u32, i32>(sa),
-            bytemuck::cast_slice_mut::<u8, i32>(s),
+            sa,
+            s.as_deref(),
             bytemuck::cast::<u32, i32>(n),
             true,
+            Some(n1),
+            Some(m),
         );
     }
 }
