@@ -27,7 +27,7 @@ fn main() -> io::Result<()> {
     let mut t = vec![];
     input_file.read_to_end(&mut t)?;
     t.append(&mut vec![0_u8]);
-    println!("{:?}", t);
+    // println!("{:?}", t);
 
     // Initialize suffix array
     let mut sa = vec![0u32; (size + 1).try_into().unwrap()];
@@ -48,11 +48,8 @@ fn main() -> io::Result<()> {
 
     // Writing suffix array to output file
     println!("Writing suffix array to output file...");
-    let output_file = File::create(output_path)?;
-    let mut writer = BufWriter::new(output_file);
-    for &elem in &sa[1..] {
-        writer.write_all(&elem.to_le_bytes())?;
-    }
+    let mut output_file = File::create(output_path)?;
+    output_file.write_all(bytemuck::cast_slice(&sa[1..])).unwrap();
 
     Ok(())
 }
